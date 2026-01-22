@@ -1,62 +1,86 @@
 pipeline {
     agent any
 
+    parameters {
+        choice(name: 'terraformAction', choices: ['apply', 'destroy'], description: 'Choose your Terraform action to perform')
+    }
+
+    environment {
+        AWS_ACCESS_KEY_ID = credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+    }
+
     stages {
-        stage('Terraform Init') {
+        stage('Git Checkout') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'aws-credentials',
-                        usernameVariable: 'AWS_ACCESS_KEY_ID',
-                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                    )
-                ]) {
+                dir('terraform') {
+                    git branch: 'terraform', url: 'https://github.com/ManojKRISHNAPPA/microdegree-IT-batch-2025.git'
+                }
+            }
+        }
+
+        stage('Terraform Init & Plan') {
+            steps {
+                dir('terraform/project-1') {
                     sh '''
+                        echo "Initializing Terraform..."
                         terraform init
+
+                        echo "Running Terraform plan..."
+                        terraform plan -out=tfplan
+
+                        echo "Generating human-readable plan output..."
+                        terraform show -no-color tfplan > tfplan.txt
                     '''
                 }
             }
         }
 
-        stage('Terraform Plan') {
+        stage('Manual Approval') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'aws-credentials',
-                        usernameVariable: 'AWS_ACCESS_KEY_ID',
-                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                script {
+                    def planOutput = readFile('terraform/project-1/tfplan.txt')
+                    input(
+                        message: "Do you want to proceed with the Terraform action?",
+                        parameters: [
+                            text(name: 'Terraform Plan Output', defaultValue: planOutput, description: 'Review the plan before continuing.')
+                        ]
                     )
-                ]) {
-                    sh '''
-                        terraform plan
-                    '''
                 }
             }
         }
 
-        stage('Terraform Apply') {
+        stage('Terraform Apply or Destroy') {
+            when {
+                expression {
+                    return params.terraformAction == 'apply' || params.terraformAction == 'destroy'
+                }
+            }
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'aws-credentials',
-                        usernameVariable: 'AWS_ACCESS_KEY_ID',
-                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                    )
-                ]) {
-                    sh '''
-                        terraform apply -auto-approve
-                    '''
+                dir('terraform/project-1') {
+                    script {
+                        if (params.terraformAction == 'apply') {
+                            echo "Applying Terraform changes..."
+                            sh 'terraform apply -input=false tfplan'
+                        } else {
+                            echo "Destroying Terraform infrastructure..."
+                            sh 'terraform destroy -auto-approve'
+                        }
+                    }
                 }
             }
         }
     }
 
     post {
-        always {
-            echo "📦 Pipeline execution completed."
+        success {
+            echo '✅ Terraform action completed successfully!'
         }
         failure {
-            echo "❌ Terraform action failed. Please check the logs."
+            echo '❌ Terraform action failed. Please check the logs.'
+        }
+        always {
+            echo '📦 Pipeline execution completed.'
         }
     }
 }
