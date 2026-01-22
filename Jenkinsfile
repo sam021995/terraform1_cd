@@ -1,86 +1,62 @@
 pipeline {
     agent any
 
-    parameters {
-        choice(name: 'terraformAction', choices: ['apply', 'destroy'], description: 'Choose your Terraform action to perform')
-    }
-
-    environment {
-        AWS_ACCESS_KEY_ID = credentials('AWS_ACCESS_KEY_ID')
-        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
-    }
-
     stages {
-        stage('Git Checkout') {
+        stage('Terraform Init') {
             steps {
-                dir('terraform') {
-                    git branch: 'terraform', url: 'https://github.com/ManojKRISHNAPPA/microdegree-IT-batch-2025.git'
-                }
-            }
-        }
-
-        stage('Terraform Init & Plan') {
-            steps {
-                dir('terraform/project-1') {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'aws-credentials',
+                        usernameVariable: 'AWS_ACCESS_KEY_ID',
+                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                    )
+                ]) {
                     sh '''
-                        echo "Initializing Terraform..."
                         terraform init
-
-                        echo "Running Terraform plan..."
-                        terraform plan -out=tfplan
-
-                        echo "Generating human-readable plan output..."
-                        terraform show -no-color tfplan > tfplan.txt
                     '''
                 }
             }
         }
 
-        stage('Manual Approval') {
+        stage('Terraform Plan') {
             steps {
-                script {
-                    def planOutput = readFile('terraform/project-1/tfplan.txt')
-                    input(
-                        message: "Do you want to proceed with the Terraform action?",
-                        parameters: [
-                            text(name: 'Terraform Plan Output', defaultValue: planOutput, description: 'Review the plan before continuing.')
-                        ]
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'aws-credentials',
+                        usernameVariable: 'AWS_ACCESS_KEY_ID',
+                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                     )
+                ]) {
+                    sh '''
+                        terraform plan
+                    '''
                 }
             }
         }
 
-        stage('Terraform Apply or Destroy') {
-            when {
-                expression {
-                    return params.terraformAction == 'apply' || params.terraformAction == 'destroy'
-                }
-            }
+        stage('Terraform Apply') {
             steps {
-                dir('terraform/project-1') {
-                    script {
-                        if (params.terraformAction == 'apply') {
-                            echo "Applying Terraform changes..."
-                            sh 'terraform apply -input=false tfplan'
-                        } else {
-                            echo "Destroying Terraform infrastructure..."
-                            sh 'terraform destroy -auto-approve'
-                        }
-                    }
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'aws-credentials',
+                        usernameVariable: 'AWS_ACCESS_KEY_ID',
+                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                    )
+                ]) {
+                    sh '''
+                        terraform apply -auto-approve
+                    '''
                 }
             }
         }
     }
 
     post {
-        success {
-            echo '✅ Terraform action completed successfully!'
+        always {
+            echo "📦 Pipeline execution completed."
         }
         failure {
-            echo '❌ Terraform action failed. Please check the logs.'
-        }
-        always {
-            echo '📦 Pipeline execution completed.'
+            echo "❌ Terraform action failed. Please check the logs."
         }
     }
 }
