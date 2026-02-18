@@ -13,7 +13,7 @@ pipeline {
     stages {
         stage('Git Checkout') {
             steps {
-                dir('terraform') {
+                dir('terraform1_cd') {
                     git branch: 'main', url: 'https://github.com/sam021995/terraform1_cd'
                 }
             }
