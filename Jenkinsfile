@@ -38,14 +38,16 @@ pipeline {
 
         stage('Manual Approval') {
             steps {
-                script {
-                    def planOutput = readFile('terraform/project-1/tfplan.txt')
-                    input(
-                        message: "Do you want to proceed with the Terraform action?",
-                        parameters: [
-                            text(name: 'Terraform Plan Output', defaultValue: planOutput, description: 'Review the plan before continuing.')
-                        ]
-                    )
+                dir('terraform1_cd') {
+                    script {
+                        def planOutput = readFile('tfplan.txt')
+                        input(
+                            message: "Do you want to proceed with the Terraform action?",
+                            parameters: [
+                                text(name: 'Terraform Plan Output', defaultValue: planOutput, description: 'Review the plan before continuing.')
+                            ]
+                        )
+                    }
                 }
             }
         }
@@ -57,7 +59,7 @@ pipeline {
                 }
             }
             steps {
-                dir('terraform/project-1') {
+                dir('terraform1_cd') {
                     script {
                         if (params.terraformAction == 'apply') {
                             echo "Applying Terraform changes..."
