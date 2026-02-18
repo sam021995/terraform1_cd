@@ -14,7 +14,7 @@ pipeline {
         stage('Git Checkout') {
             steps {
                 dir('terraform') {
-                    git branch: 'terraform', url: 'https://github.com/ManojKRISHNAPPA/microdegree-IT-batch-2025.git'
+                    git branch: 'main', url: 'https://github.com/sam021995/terraform1_cd'
                 }
             }
         }
