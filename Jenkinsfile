@@ -21,7 +21,7 @@ pipeline {
 
         stage('Terraform Init & Plan') {
             steps {
-                dir('terraform/project-1') {
+                dir('terraform1_cd') {
                     sh '''
                         echo "Initializing Terraform..."
                         terraform init
